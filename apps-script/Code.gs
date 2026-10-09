@@ -7,7 +7,7 @@
  */
 
 const FOLDER_ID = '1EbfegnpqRH_JXy0Rv6NiPB1BrZ-JIgIp';
-const ORIGIN = 'https://mfco239.github.io';           // the share page's address
+const ORIGIN = 'https://share.marcofishingcompany.com';           // the share page's address
 const MAX_BYTES = 4 * 1024 * 1024 * 1024;             // 4 GB per file
 const MAX_PER_HOUR = 300;                             // upload links handed out per hour, all guests
 const OK_TYPES = /^(image|video)\//;
