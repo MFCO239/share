@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Share Your Trip | Marco Fishing Co.</title>
+<meta name="description" content="Send Marco Fishing Company your photos and videos from your trip.">
+<link rel="icon" href="favicon.png">
+<style>
+  :root {
+    --charcoal: #404040; --ink: #262626; --orange: #c9622a; --orange-dark: #a94f1f;
+    --sea: #e9f3f2; --line: #d9dedd; --bg: #f7f6f2; --card: #ffffff; --muted: #6b6b6b; --ok: #2f7d4f; --bad: #b3261e;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ink: #f1efe9; --charcoal: #e6e3dc; --bg: #1c1d1d; --card: #262828; --line: #3a3d3d; --muted: #a6a6a6; --sea: #233130;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif; }
+  main { max-width: 520px; margin: 0 auto; padding: 24px 16px 48px; }
+  .logo { display: block; width: 120px; height: 120px; margin: 4px auto 12px; }
+  h1 { font-size: 28px; line-height: 1.2; text-align: center; margin: 0 0 6px; color: var(--charcoal); }
+  .lead { text-align: center; color: var(--muted); margin: 0 0 22px; }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; margin-bottom: 16px; }
+  label { display: block; font-weight: 600; margin: 0 0 6px; }
+  .opt { font-weight: 400; color: var(--muted); }
+  input[type=text], input[type=date], select {
+    width: 100%; font: inherit; padding: 12px; border-radius: 10px; border: 1px solid var(--line);
+    background: var(--bg); color: var(--ink); margin-bottom: 14px;
+  }
+  .pick { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px;
+    border: 2px dashed var(--orange); border-radius: 14px; padding: 26px 12px; text-align: center; cursor: pointer; background: var(--sea); }
+  .pick strong { font-size: 19px; color: var(--orange-dark); }
+  .pick span { color: var(--muted); font-size: 15px; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) .pick strong { color: #e58a55; } }
+  #files { display: none; }
+  .check { display: flex; gap: 10px; align-items: flex-start; font-weight: 400; margin: 4px 0 0; }
+  .check input { width: 22px; height: 22px; margin-top: 2px; flex: none; accent-color: var(--orange); }
+  button { width: 100%; font: inherit; font-weight: 700; font-size: 19px; color: #fff; background: var(--orange);
+    border: 0; border-radius: 12px; padding: 16px; cursor: pointer; }
+  button:disabled { opacity: .45; cursor: default; }
+  ul { list-style: none; margin: 12px 0 0; padding: 0; }
+  li { padding: 10px 0; border-top: 1px solid var(--line); font-size: 15px; }
+  li:first-child { border-top: 0; }
+  .row { display: flex; justify-content: space-between; gap: 10px; }
+  .fname { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .status { flex: none; color: var(--muted); }
+  .status.ok { color: var(--ok); } .status.bad { color: var(--bad); }
+  progress { width: 100%; height: 8px; margin-top: 6px; accent-color: var(--orange); }
+  .thanks { display: none; text-align: center; }
+  .thanks h2 { color: var(--charcoal); margin: 6px 0; }
+  .small { font-size: 14px; color: var(--muted); text-align: center; margin-top: 20px; }
+  a { color: var(--orange-dark); }
+</style>
+</head>
+<body>
+<main>
+  <img class="logo" src="logo.png" alt="Marco Fishing Company">
+  <h1>Got a great shot from your trip?</h1>
+  <p class="lead">Send us your photos and videos. Your catch could end up on our page.</p>
+
+  <form id="form" novalidate>
+    <div class="card">
+      <label class="pick" for="files">
+        <strong>Choose photos &amp; videos</strong>
+        <span>Tap to pick from your phone. Pick as many as you like.</span>
+      </label>
+      <input id="files" type="file" accept="image/*,video/*" multiple>
+      <ul id="list"></ul>
+    </div>
+
+    <div class="card">
+      <label for="guest">Your first name <span class="opt">(optional)</span></label>
+      <input id="guest" type="text" autocomplete="given-name" maxlength="40">
+      <label for="tripDate">Trip date <span class="opt">(optional)</span></label>
+      <input id="tripDate" type="date">
+      <label for="captain">Your captain <span class="opt">(optional)</span></label>
+      <select id="captain">
+        <option value="">Not sure</option>
+        <option>Captain Landon</option><option>Captain Dom</option><option>Captain Mateo</option>
+        <option>Captain Vu</option><option>Captain Jonah</option><option>Captain Tex</option>
+        <option>Captain Matt</option><option>Captain Jamie</option><option>Another captain</option>
+      </select>
+      <label class="check"><input id="consent" type="checkbox">
+        <span>Marco Fishing Company can share these on its social media pages and website. (We never post kids' names.)</span></label>
+    </div>
+
+    <button id="send" type="submit" disabled>Send</button>
+  </form>
+
+  <div class="card thanks" id="thanks">
+    <h2>Thank you!</h2>
+    <p>We got your photos and videos. If we post one, we'll tag Marco Fishing Company so you can find it.</p>
+    <p>Loved your trip? A quick review helps a small local business a lot.</p>
+    <p><a href="https://g.page/r/CWYlcISu915eEBM/review">Leave us a Google review</a></p>
+  </div>
+
+  <p class="small">Marco Fishing Company · Marco Island &amp; Goodland, FL · <a href="https://www.marcofishingco.com">marcofishingco.com</a></p>
+</main>
+
+<script>
+const SCRIPT_URL = 'PASTE_APPS_SCRIPT_WEB_APP_URL';
+const CHUNK = 16 * 256 * 1024;          // 4 MB pieces (Google wants multiples of 256 KB)
+const files = document.getElementById('files');
+const list = document.getElementById('list');
+const send = document.getElementById('send');
+const consent = document.getElementById('consent');
+let picked = [];
+
+function fmt(n) { return n > 1e9 ? (n / 1e9).toFixed(1) + ' GB' : (n / 1e6).toFixed(0) + ' MB'; }
+function ready() { send.disabled = !(picked.length && consent.checked); }
+
+files.addEventListener('change', () => {
+  picked = Array.from(files.files).filter(f => /^(image|video)\//.test(f.type));
+  list.innerHTML = '';
+  picked.forEach((f, i) => {
+    const li = document.createElement('li');
+    li.innerHTML = `<div class="row"><span class="fname"></span><span class="status" id="s${i}">${fmt(f.size)}</span></div>
+                    <progress id="p${i}" max="100" value="0" hidden></progress>`;
+    li.querySelector('.fname').textContent = f.name;
+    list.appendChild(li);
+  });
+  ready();
+});
+consent.addEventListener('change', ready);
+
+async function ask(body) {
+  const r = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(body) });  // text/plain: no preflight
+  return r.json();
+}
+
+function putChunk(url, file, start) {
+  return new Promise((resolve, reject) => {
+    const end = Math.min(start + CHUNK, file.size);
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', url);
+    xhr.setRequestHeader('Content-Range', `bytes ${start}-${end - 1}/${file.size}`);
+    xhr.onload = () => (xhr.status === 308 || xhr.status === 200 || xhr.status === 201)
+      ? resolve(end) : reject(new Error('Upload stopped (' + xhr.status + ')'));
+    xhr.onerror = () => reject(new Error('Connection dropped'));
+    xhr.send(file.slice(start, end));
+  });
+}
+
+async function upload(file, i, guest) {
+  const s = document.getElementById('s' + i), p = document.getElementById('p' + i);
+  p.hidden = false; s.className = 'status'; s.textContent = 'Starting…';
+  const start = await ask({ action: 'start', name: file.name, size: file.size, type: file.type, guest });
+  if (!start.url) throw new Error(start.error || 'Could not start');
+  let sent = 0, tries = 0;
+  while (sent < file.size) {
+    try {
+      sent = await putChunk(start.url, file, sent);
+      tries = 0;
+      p.value = Math.round(100 * sent / file.size);
+      s.textContent = p.value + '%';
+    } catch (e) {
+      if (++tries > 4) throw e;
+      s.textContent = 'Reconnecting…';
+      await new Promise(r => setTimeout(r, 2000 * tries));
+    }
+  }
+  s.textContent = 'Sent ✓'; s.className = 'status ok';
+}
+
+document.getElementById('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  if (send.disabled) return;
+  send.disabled = true; files.disabled = true; send.textContent = 'Sending… keep this page open';
+  const guest = document.getElementById('guest').value.trim();
+  const done = [];
+  for (let i = 0; i < picked.length; i++) {
+    try { await upload(picked[i], i, guest); done.push(picked[i].name); }
+    catch (err) { const s = document.getElementById('s' + i); s.textContent = err.message; s.className = 'status bad'; }
+  }
+  try {
+    await ask({ action: 'done', guest, tripDate: document.getElementById('tripDate').value,
+                captain: document.getElementById('captain').value, consent: consent.checked, files: done });
+  } catch (err) { /* the files are already in; the note is a bonus */ }
+  if (done.length) {
+    document.getElementById('form').style.display = 'none';
+    document.getElementById('thanks').style.display = 'block';
+  } else {
+    send.textContent = 'Try again'; send.disabled = false; files.disabled = false;
+  }
+});
+</script>
+</body>
+</html>
