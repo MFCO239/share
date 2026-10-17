@@ -25,7 +25,7 @@
   .card { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 18px; margin-bottom: 16px; }
   label { display: block; font-weight: 600; margin: 0 0 6px; }
   .opt { font-weight: 400; color: var(--muted); }
-  input[type=text], input[type=date], select {
+  input[type=text], input[type=email], input[type=date], select {
     width: 100%; font: inherit; padding: 12px; border-radius: 10px; border: 1px solid var(--line);
     background: var(--bg); color: var(--ink); margin-bottom: 14px;
   }
@@ -79,11 +79,18 @@
       <select id="captain">
         <option value="">Not sure</option>
         <option>Captain Landon</option><option>Captain Dom</option><option>Captain Mateo</option>
-        <option>Captain Vu</option><option>Captain Jonah</option><option>Captain Tex</option>
+        <option>Captain Jonah</option><option>Captain Tex</option>
         <option>Captain Matt</option><option>Captain Jamie</option><option>Another captain</option>
       </select>
       <label class="check"><input id="consent" type="checkbox">
         <span>Marco Fishing Company can share these on its social media pages and website. (We never post kids' names.)</span></label>
+    </div>
+
+    <div class="card">
+      <label for="email">Your email <span class="opt">(optional)</span></label>
+      <input id="email" type="email" autocomplete="email" inputmode="email" maxlength="80">
+      <label class="check"><input id="news" type="checkbox">
+        <span>Send me the weekly Marco Island fishing report and past-guest deals. Unsubscribe anytime.</span></label>
     </div>
 
     <button id="send" type="submit" disabled>Send</button>
@@ -106,6 +113,7 @@ const files = document.getElementById('files');
 const list = document.getElementById('list');
 const send = document.getElementById('send');
 const consent = document.getElementById('consent');
+const news = document.getElementById('news');
 let picked = [];
 
 function fmt(n) { return n > 1e9 ? (n / 1e9).toFixed(1) + ' GB' : (n / 1e6).toFixed(0) + ' MB'; }
@@ -124,6 +132,7 @@ files.addEventListener('change', () => {
   ready();
 });
 consent.addEventListener('change', ready);
+document.getElementById('email').addEventListener('input', e => { if (e.target.value.includes('@')) news.checked = true; });
 
 async function ask(body) {
   const r = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(body) });  // text/plain: no preflight
@@ -176,7 +185,9 @@ document.getElementById('form').addEventListener('submit', async (e) => {
   }
   try {
     await ask({ action: 'done', guest, tripDate: document.getElementById('tripDate').value,
-                captain: document.getElementById('captain').value, consent: consent.checked, files: done });
+                captain: document.getElementById('captain').value, consent: consent.checked, files: done,
+                // email only goes along when they ticked the box
+                email: news.checked ? document.getElementById('email').value.trim() : '', newsletter: news.checked });
   } catch (err) { /* the files are already in; the note is a bonus */ }
   if (done.length) {
     document.getElementById('form').style.display = 'none';

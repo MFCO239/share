@@ -66,6 +66,10 @@ function done(req) {
     'Captain: ' + clean(req.captain).slice(0, 40),
     'OK to post: ' + (req.consent === true ? 'YES (checked the box)' : 'NO'),
     'Files: ' + (req.files || []).map(clean).slice(0, 50).join(', '),
+    // Newsletter sign-up: only when they ticked the box. The monthly Mailchimp import reads these.
+    'Wants emails: ' + (req.newsletter === true ? 'YES' : 'NO'),
+    'Email: ' + (req.newsletter === true && /^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(String(req.email || '').trim())
+      ? String(req.email).trim().toLowerCase().slice(0, 80) : ''),
   ];
   DriveApp.getFolderById(FOLDER_ID).createFile(
     '_note ' + Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd HHmmss') + '.txt',
