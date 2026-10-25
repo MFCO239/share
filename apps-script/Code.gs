@@ -21,6 +21,7 @@ function doPost(e) {
   }
   if (req.action === 'start') return start(req);
   if (req.action === 'done') return done(req);
+  if (req.action === 'signup') return signup(req);
   return reply({ error: 'unknown action' });
 }
 
@@ -73,6 +74,27 @@ function done(req) {
   ];
   DriveApp.getFolderById(FOLDER_ID).createFile(
     '_note ' + Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd HHmmss') + '.txt',
+    lines.join('\n'));
+  return reply({ ok: true });
+}
+
+// Fishing report sign-up from the dock QR page (/report). Same note format as done(), so the
+// monthly Mailchimp import ("mailchimp.py signups") picks these up too.
+function signup(req) {
+  if (req.website) return reply({ ok: true });                       // bot filled the hidden field
+  const email = String(req.email || '').trim().toLowerCase().slice(0, 80);
+  if (req.newsletter !== true) return reply({ error: 'Please tick the box to sign up' });
+  if (!/^[^@\s]+@[^@\s]+\.[a-z]{2,}$/i.test(email)) return reply({ error: 'That email doesn\'t look right' });
+  if (!underLimit()) return reply({ error: 'Lots of sign-ups right now. Please try again in an hour' });
+  const lines = [
+    'Fishing report sign-up ' + new Date().toISOString(),
+    'Name: ' + clean(req.guest).slice(0, 60),
+    'Source: dock QR (fishing report page)',
+    'Wants emails: YES (ticked the box)',
+    'Email: ' + email,
+  ];
+  DriveApp.getFolderById(FOLDER_ID).createFile(
+    '_note ' + Utilities.formatDate(new Date(), 'America/New_York', 'yyyy-MM-dd HHmmss') + ' signup.txt',
     lines.join('\n'));
   return reply({ ok: true });
 }
