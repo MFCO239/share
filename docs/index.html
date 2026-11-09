@@ -105,6 +105,7 @@
     <p>We got your photos and videos. If we post one, we'll tag Marco Fishing Company so you can find it.</p>
     <p>Loved your trip? A quick review helps a small local business a lot.</p>
     <p><a href="https://g.page/r/CWYlcISu915eEBM/review">Leave us a Google review</a></p>
+    <button id="more" type="button">Send more photos &amp; videos</button>
   </div>
 
   <p class="small">Marco Fishing Company · Marco Island &amp; Goodland, FL · <a href="https://www.marcofishingco.com">marcofishingco.com</a></p>
@@ -219,6 +220,15 @@ async function upload(p, guest) {
     }
   }
 }
+
+// After a finished send: start a new batch (name, trip, captain and OK box stay filled in).
+document.getElementById('more').addEventListener('click', () => {
+  picked = []; files.value = ''; list.innerHTML = '';
+  msg.textContent = ''; msg.className = 'msg'; send.textContent = 'Send';
+  document.getElementById('thanks').style.display = 'none';
+  document.getElementById('form').style.display = '';
+  ready(); window.scrollTo(0, 0);
+});
 
 document.getElementById('form').addEventListener('submit', async (e) => {
   e.preventDefault();
