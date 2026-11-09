@@ -50,6 +50,9 @@
   progress { width: 100%; height: 8px; margin-top: 6px; accent-color: var(--orange); }
   .thanks { display: none; text-align: center; }
   .thanks h2 { color: var(--charcoal); margin: 6px 0; }
+  .msg { text-align: center; margin: 0 0 12px; color: var(--muted); }
+  .msg:empty { display: none; }
+  .msg.bad { color: var(--bad); font-weight: 600; }
   .small { font-size: 14px; color: var(--muted); text-align: center; margin-top: 20px; }
   a { color: var(--orange-dark); }
 </style>
@@ -93,6 +96,7 @@
         <span>Send me the weekly Marco Island fishing report and past-guest deals. Unsubscribe anytime.</span></label>
     </div>
 
+    <p class="msg" id="msg" aria-live="polite"></p>
     <button id="send" type="submit" disabled>Send</button>
   </form>
 
@@ -114,86 +118,143 @@ const list = document.getElementById('list');
 const send = document.getElementById('send');
 const consent = document.getElementById('consent');
 const news = document.getElementById('news');
-let picked = [];
+const msg = document.getElementById('msg');
+let picked = [];      // { file, i, state: 'waiting' | 'sent' | 'failed', url, sent }
+let sending = false;
 
-function fmt(n) { return n > 1e9 ? (n / 1e9).toFixed(1) + ' GB' : (n / 1e6).toFixed(0) + ' MB'; }
-function ready() { send.disabled = !(picked.length && consent.checked); }
+// Some phones leave a file's type blank (HEIC photos, some videos). Fill it in from the name.
+const EXT = { jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', heic: 'image/heic', heif: 'image/heif',
+              gif: 'image/gif', webp: 'image/webp', dng: 'image/x-adobe-dng', mov: 'video/quicktime',
+              mp4: 'video/mp4', m4v: 'video/x-m4v', hevc: 'video/mp4', avi: 'video/x-msvideo', '3gp': 'video/3gpp' };
+function typeOf(f) {
+  if (/^(image|video)\//.test(f.type)) return f.type;
+  return EXT[(f.name.split('.').pop() || '').toLowerCase()] || '';
+}
+
+function fmt(n) { return n > 1e9 ? (n / 1e9).toFixed(1) + ' GB' : Math.max(1, Math.round(n / 1e6)) + ' MB'; }
+function ready() { send.disabled = sending || !(picked.some(p => p.state !== 'sent') && consent.checked); }
+function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 files.addEventListener('change', () => {
-  picked = Array.from(files.files).filter(f => /^(image|video)\//.test(f.type));
+  picked = Array.from(files.files).filter(f => typeOf(f))
+    .map((file, i) => ({ file, i, state: 'waiting', url: '', sent: 0 }));
   list.innerHTML = '';
-  picked.forEach((f, i) => {
+  picked.forEach(p => {
     const li = document.createElement('li');
-    li.innerHTML = `<div class="row"><span class="fname"></span><span class="status" id="s${i}">${fmt(f.size)}</span></div>
-                    <progress id="p${i}" max="100" value="0" hidden></progress>`;
-    li.querySelector('.fname').textContent = f.name;
+    li.innerHTML = `<div class="row"><span class="fname"></span><span class="status" id="s${p.i}">${fmt(p.file.size)}</span></div>
+                    <progress id="p${p.i}" max="100" value="0" hidden></progress>`;
+    li.querySelector('.fname').textContent = p.file.name;
     list.appendChild(li);
   });
+  msg.textContent = ''; msg.className = 'msg'; send.textContent = 'Send';
   ready();
 });
 consent.addEventListener('change', ready);
 document.getElementById('email').addEventListener('input', e => { if (e.target.value.includes('@')) news.checked = true; });
+
+// Keep the screen on while sending (a locked phone stops the upload).
+let lock = null;
+async function keepAwake() { try { if (navigator.wakeLock && !lock) { lock = await navigator.wakeLock.request('screen'); lock.addEventListener('release', () => { lock = null; }); } } catch (e) {} }
+document.addEventListener('visibilitychange', () => { if (sending && document.visibilityState === 'visible') keepAwake(); });
+window.addEventListener('beforeunload', e => { if (sending) { e.preventDefault(); e.returnValue = ''; } });
 
 async function ask(body) {
   const r = await fetch(SCRIPT_URL, { method: 'POST', body: JSON.stringify(body) });  // text/plain: no preflight
   return r.json();
 }
 
-function putChunk(url, file, start) {
+function put(url, headers, body) {
   return new Promise((resolve, reject) => {
-    const end = Math.min(start + CHUNK, file.size);
     const xhr = new XMLHttpRequest();
     xhr.open('PUT', url);
-    xhr.setRequestHeader('Content-Range', `bytes ${start}-${end - 1}/${file.size}`);
-    xhr.onload = () => (xhr.status === 308 || xhr.status === 200 || xhr.status === 201)
-      ? resolve(end) : reject(new Error('Upload stopped (' + xhr.status + ')'));
-    xhr.onerror = () => reject(new Error('Connection dropped'));
-    xhr.send(file.slice(start, end));
+    for (const k in headers) xhr.setRequestHeader(k, headers[k]);
+    xhr.timeout = 120000;
+    xhr.onload = () => resolve(xhr);
+    xhr.onerror = xhr.ontimeout = () => reject(new Error('Connection dropped'));
+    xhr.send(body);
   });
 }
 
-async function upload(file, i, guest) {
-  const s = document.getElementById('s' + i), p = document.getElementById('p' + i);
-  p.hidden = false; s.className = 'status'; s.textContent = 'Starting…';
-  const start = await ask({ action: 'start', name: file.name, size: file.size, type: file.type, guest });
-  if (!start.url) throw new Error(start.error || 'Could not start');
-  let sent = 0, tries = 0;
-  while (sent < file.size) {
+// Ask Google how much of the file it already has, so we pick up where we left off.
+async function howMuch(p) {
+  const xhr = await put(p.url, { 'Content-Range': `bytes */${p.file.size}` }, null);
+  if (xhr.status === 200 || xhr.status === 201) return p.file.size;
+  if (xhr.status === 308) { const m = /bytes=0-(\d+)/.exec(xhr.getResponseHeader('Range') || ''); return m ? Number(m[1]) + 1 : 0; }
+  if (xhr.status === 404 || xhr.status === 410) { p.url = ''; return 0; }   // link expired: start this file over
+  throw new Error('Upload stopped (' + xhr.status + ')');
+}
+
+async function upload(p, guest) {
+  const s = document.getElementById('s' + p.i), bar = document.getElementById('p' + p.i);
+  bar.hidden = false; s.className = 'status'; s.textContent = p.sent ? 'Resuming…' : 'Starting…';
+  let tries = 0, check = !!p.url;   // coming back to a file: first ask Google where it stopped
+  while (true) {
     try {
-      sent = await putChunk(start.url, file, sent);
-      tries = 0;
-      p.value = Math.round(100 * sent / file.size);
-      s.textContent = p.value + '%';
+      if (!p.url) {
+        const start = await ask({ action: 'start', name: p.file.name, size: p.file.size, type: typeOf(p.file), guest });
+        if (!start.url) { const e = new Error(start.error || 'Could not start'); e.final = !!start.error; throw e; }
+        p.url = start.url; p.sent = 0;
+      } else if (check || tries) {
+        p.sent = await howMuch(p); check = false;
+        if (!p.url) continue;
+      }
+      while (p.sent < p.file.size) {
+        const end = Math.min(p.sent + CHUNK, p.file.size);
+        const xhr = await put(p.url, { 'Content-Range': `bytes ${p.sent}-${end - 1}/${p.file.size}` }, p.file.slice(p.sent, end));
+        if (xhr.status === 200 || xhr.status === 201) p.sent = p.file.size;
+        else if (xhr.status === 308) { const m = /bytes=0-(\d+)/.exec(xhr.getResponseHeader('Range') || ''); p.sent = m ? Number(m[1]) + 1 : end; }
+        else if (xhr.status === 404 || xhr.status === 410) { p.url = ''; throw new Error('Link expired'); }
+        else throw new Error('Upload stopped (' + xhr.status + ')');
+        tries = 0;
+        bar.value = Math.round(100 * p.sent / p.file.size);
+        s.textContent = bar.value + '%';
+      }
+      s.textContent = 'Sent ✓'; s.className = 'status ok'; bar.hidden = true;
+      return;
     } catch (e) {
-      if (++tries > 4) throw e;
-      s.textContent = 'Reconnecting…';
-      await new Promise(r => setTimeout(r, 2000 * tries));
+      // Weak signal on the water: keep trying for about 3 minutes before giving up on this file.
+      if (e.final || ++tries > 12) throw e;
+      s.textContent = 'Weak signal, retrying…';
+      await wait(Math.min(3000 * tries, 20000));
     }
   }
-  s.textContent = 'Sent ✓'; s.className = 'status ok';
 }
 
 document.getElementById('form').addEventListener('submit', async (e) => {
   e.preventDefault();
   if (send.disabled) return;
-  send.disabled = true; files.disabled = true; send.textContent = 'Sending… keep this page open';
+  sending = true; ready(); files.disabled = true;
+  send.textContent = 'Sending…';
+  msg.className = 'msg'; msg.textContent = 'Please keep this page open until every file says Sent ✓.';
+  keepAwake();
   const guest = document.getElementById('guest').value.trim();
-  const done = [];
-  for (let i = 0; i < picked.length; i++) {
-    try { await upload(picked[i], i, guest); done.push(picked[i].name); }
-    catch (err) { const s = document.getElementById('s' + i); s.textContent = err.message; s.className = 'status bad'; }
+  const now = [];
+  for (const p of picked) {
+    if (p.state === 'sent') continue;
+    try { await upload(p, guest); p.state = 'sent'; now.push(p.file.name); }
+    catch (err) { p.state = 'failed'; const s = document.getElementById('s' + p.i); s.textContent = 'Not sent'; s.className = 'status bad'; }
   }
+  const failed = picked.filter(p => p.state === 'failed').map(p => p.file.name);
   try {
     await ask({ action: 'done', guest, tripDate: document.getElementById('tripDate').value,
-                captain: document.getElementById('captain').value, consent: consent.checked, files: done,
+                captain: document.getElementById('captain').value, consent: consent.checked,
+                // files that didn't make it are listed too, so we know to ask for them
+                files: now.concat(failed.map(n => 'NOT SENT ' + n)),
                 // email only goes along when they ticked the box
                 email: news.checked ? document.getElementById('email').value.trim() : '', newsletter: news.checked });
   } catch (err) { /* the files are already in; the note is a bonus */ }
-  if (done.length) {
+  sending = false; files.disabled = false;
+  if (lock) { try { lock.release(); } catch (e) {} lock = null; }
+  if (!failed.length) {
     document.getElementById('form').style.display = 'none';
     document.getElementById('thanks').style.display = 'block';
+    window.scrollTo(0, 0);
   } else {
-    send.textContent = 'Try again'; send.disabled = false; files.disabled = false;
+    const ok = picked.length - failed.length;
+    msg.className = 'msg bad';
+    msg.textContent = `${ok} of ${picked.length} sent. The signal may be weak here. Tap below to send the rest, or try again later on Wi-Fi.`;
+    send.textContent = failed.length === 1 ? 'Send the last one' : `Send the other ${failed.length}`;
+    ready();
   }
 });
 </script>
